@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>ChatGMP</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #007bff; /* A nice blue for accents */
+            --secondary-color: #6c757d; /* Grey for secondary text */
+            --dtu-color: #990000; /* DTU red */
+            --background-color: #f8f9fa; /* Light background - now mostly covered by image */
+            --card-background: #ffffff; /* White for card-like elements */
+            --border-color: #dee2e6; /* Light grey for borders */
+            --user-bubble-bg:rgb(231, 232, 245); /* #e0f7fa; Light cyan for user messages */
+            --bot-bubble-bg:rgb(252, 229, 229); /* #f3e5f5; Light purple for bot messages */
+            --text-color: #343a40; /* Dark grey for general text */
+            --font-family: 'Roboto', sans-serif;
+            --record-button-color: #28a745; /* Green for record button */
+            --record-button-hover:rgb(34, 139, 59);
+            --tts-on-color: #ffc107; /* Yellow for TTS On */
+            --tts-off-color: #dc3545; /* Red for TTS Off */
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%; /* Make html and body take full viewport height */
+            margin: 0;
+            font-family: var(--font-family);
+            background-color: var(--background-color);
+            color: var(--text-color);
+            line-height: 1.6;
+
+            background-image: url('static/background.jpg');
+            background-size: cover;
+            background-position: center center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            overflow: hidden; /* This stops both horizontal and vertical scrolling */
+            display: flex;
+            flex-direction: column; /* Stack children vertically */
+            align-items: center; /* Centers items horizontally */
+        }
+
+        /* Background overlay */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            /* background-color: rgba(255, 255, 255, 0.5); White overlay with 50% opacity */
+            z-index: -1;
+        }
+
+        /* 2. H1 - Title styling (fixed position) */
+        h1 {
+            color: var(--dtu-color); /* Red title */
+            text-align: center;
+            padding: 0; /* Removed vertical padding here, manage spacing with margin */
+            margin-top: 20px; /* Space between top of page and title */
+            margin-bottom: 20px; /* Space between title and chatbox */
+            font-weight: 700;
+            font-size: 3.5em;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            flex-shrink: 0; /* Prevent h1 from shrinking, it keeps its content height */
+        }
+
+        /* Header container with logout button */
+        .header-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 90%;
+            max-width: 800px;
+            margin: 20px auto 20px auto;
+        }
+
+        .header-container h1 {
+            flex-grow: 1;
+            margin: 0;
+            text-align: center;
+        }
+
+        .logout-btn {
+            padding: 10px 20px;
+            background-color: var(--dtu-color);
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 14px;
+            font-weight: 600;
+            transition: background-color 0.3s;
+            white-space: nowrap;
+            margin-left: 20px;
+        }
+
+        .logout-btn:hover {
+            background-color: #7a0000;
+            text-decoration: none;
+        }
+
+        #providerSelect {
+            padding: 10px 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 25px;
+            background-color: var(--card-background);
+            font-family: var(--font-family);
+            font-size: 16px;
+            cursor: pointer;
+            outline: none;
+            transition: border-color 0.3s ease;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+        }
+
+        #providerSelect:focus {
+            border-color: var(--primary-color);
+        }
+
+        /* 3. Chat Wrapper - Make it fill available space and hide its own overflow */
+        .chat-wrapper {
+            max-width: 800px; /* Max width for larger screens */
+            width: 90%; /* Takes 90% of screen width, useful for smaller screens */
+            margin: 0 auto 20px auto; /* Centers horizontally, bottom margin for spacing */
+            
+            background-color: var(--card-background);
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+
+            /* NEW: Flexbox for inner layout (chatbox + user input) */
+            display: flex;
+            flex-direction: column; /* Stack chatbox and user input vertically */
+
+            /* NEW: Make it grow to fill the remaining vertical space */
+            flex-grow: 1; /* CRITICAL: This makes the chat-wrapper take all available space */
+            min-height: 0; /* CRITICAL: Allows flex-grow to work even if content is small */
+            /* NEW: Prevent the chat-wrapper itself from scrolling vertically */
+            overflow-y: hidden; /* CRITICAL: Only #chatbox will scroll internally */
+            
+            margin-bottom: 20px; /* Space between chatbox and bottom of screen */
+        }
+
+        /* 4. Chatbox - Enable its own internal scrolling */
+        #chatbox {
+            flex-grow: 1; /* Makes chatbox fill available space within chat-wrapper */
+            padding: 20px;
+            overflow-y: auto; /* THIS ENABLES VERTICAL SCROLLING ONLY FOR THE CHATBOX */
+            overflow-x: hidden; /* Keeps horizontal scrollbar hidden (from previous fix) */
+            border-bottom: 1px solid var(--border-color);
+            display: flex; /* Keep for message alignment */
+            flex-direction: column; /* Keep for message alignment */
+            min-height: 0; /* CRITICAL: Allows flex item to shrink inside a flex container */
+        }
+
+        .userText, .botText {
+            margin-bottom: 15px;
+            font-size: 16px;
+            line-height: 1.5;
+            display: flex;
+        }
+
+        .userText {
+            justify-content: flex-end;
+        }
+
+        .botText {
+            justify-content: flex-start;
+        }
+
+        .userText span {
+            background-color: var(--user-bubble-bg);
+            color: var(--text-color);
+            padding: 12px 18px;
+            border-radius: 20px 20px 5px 20px;
+            max-width: 75%;
+            word-wrap: break-word; /* Ensures long words break */
+        }
+
+        .botText span {
+            background-color: var(--bot-bubble-bg);
+            color: var(--text-color);
+            padding: 12px 18px;
+            border-radius: 20px 20px 20px 5px;
+            max-width: 75%;
+            word-wrap: break-word; /* Ensures long words break */
+        }
+
+        /* Styling for the loading indicator (three pulsing dots) */
+        .loading-indicator {
+            justify-content: flex-start; /* Align left like bot messages */
+            margin-bottom: 15px;
+            font-size: 16px;
+            line-height: 1.5;
+            display: flex;
+            padding-left: 20px;
+        }
+
+        .loading-indicator span {
+            background-color: var(--bot-bubble-bg);
+            padding: 12px 18px;
+            border-radius: 20px 20px 20px 5px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            max-width: 75%;
+        }
+
+        .loading-indicator span .dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--text-color);
+            border-radius: 50%;
+            animation: pulse-dot 1.2s infinite ease-in-out both;
+        }
+
+        .loading-indicator span .dot:nth-child(1) {
+            animation-delay: 0s;
+        }
+
+        .loading-indicator span .dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .loading-indicator span .dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes pulse-dot {
+            0%, 80%, 100% {
+                transform: scale(0);
+                opacity: 0;
+            }
+            40% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        /* CSS for the video container */
+        .video-container {
+            position: relative;
+            padding-bottom: 56.25%; /* This creates a 16:9 aspect ratio */
+            height: 0;
+            overflow: hidden;
+            max-width: 100%;
+            background: #000; /* Black background while loading or for letterboxing */
+            border-radius: 5px; /* Slightly rounded corners for the video player */
+            margin-top: 5px; /* Small space from any text above it within the bubble */
+        }
+
+        .video-container iframe,
+        .video-container video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: none; /* Remove iframe border */
+        }
+
+        /* 5. User Input - Fixed height part of chat-wrapper */
+        #userInput {
+            display: flex;
+            padding: 20px;
+            border-top: 1px solid var(--border-color);
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+            flex-shrink: 0; /* Prevent it from shrinking, keeps its content height */
+        }
+
+        #textInput {
+            flex-grow: 1;
+            padding: 12px 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 25px;
+            font-family: var(--font-family);
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.3s ease;
+            min-width: 150px;
+            resize: none;
+            overflow: hidden;
+            line-height: 1.5;
+            min-height: 46px;
+            box-sizing: border-box;
+        }
+
+        #textInput:focus {
+            border-color: var(--primary-color);
+        }
+
+        #buttonInput, #recordButton {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+            white-space: nowrap;
+        }
+
+        #buttonInput:hover {
+            background-color: #0056b3;
+            transform: translateY(-1px);
+        }
+
+        #recordButton {
+            background-color: var(--record-button-color);
+        }
+
+        #recordButton:hover {
+            background-color: var(--record-button-hover);
+            transform: translateY(-1px);
+        }
+
+        #recordButton.recording {
+            background-color: #ffc107;
+            color: var(--text-color);
+            animation: pulse 1s infinite alternate;
+        }
+        
+        #controlsRow {
+            width: 100%;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        #controlsRow #toggleSpeechButton,
+        #controlsRow #voiceSelect,
+        #controlsRow #speechSpeedSelect,
+        #controlsRow #providerSelect {
+            flex: 1;
+            min-width: 0;
+        }
+
+        #toggleSpeechButton {
+            padding: 10px 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 25px;
+            background-color: var(--card-background);
+            color: var(--text-color);
+            font-family: var(--font-family);
+            font-size: 16px;
+            font-weight: normal;
+            cursor: pointer;
+            outline: none;
+            transition: border-color 0.3s ease;
+            white-space: nowrap;
+        }
+
+        #toggleSpeechButton:hover {
+            border-color: var(--primary-color);
+        }
+
+        #voiceSelect {
+            padding: 10px 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 25px;
+            background-color: var(--card-background);
+            font-family: var(--font-family);
+            font-size: 16px;
+            cursor: pointer;
+            outline: none;
+            transition: border-color 0.3s ease;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20256%20256%22%3E%3Cpath%20fill%3D%22%23333%22%20d%3D%22M208.5%2089.4l-72.5%2072.5c-4.7%204.7-12.3%204.7-17%200l-72.5-72.5c-4.7-4.7-4.7-12.3%200-17s12.3-4.7%2017%200l63.5%2063.5L191.5%2072.4c4.7-4.7%2012.3-4.7%2017%200s4.7%2012.3%200%2017z%22%2F%3E%3C%2Fsvg%3E');
+            background-repeat: no-repeat;
+            background-position: right 15px center;
+            background-size: 12px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        #voiceSelect:focus {
+            border-color: var(--primary-color);
+        }
+
+        #speechSpeedSelect {
+            padding: 10px 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 25px;
+            background-color: var(--card-background);
+            font-family: var(--font-family);
+            font-size: 16px;
+            cursor: pointer;
+            outline: none;
+            transition: border-color 0.3s ease;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+        }
+
+        #speechSpeedSelect:focus {
+            border-color: var(--primary-color);
+        }
+
+        @keyframes pulse {
+            from { transform: scale(1); }
+            to { transform: scale(1.03); }
+        }
+
+        /* Styles to make the main page scrollbar transparent/invisible */
+        /* For Webkit browsers (Chrome, Safari, newer Edge versions) */
+        ::-webkit-scrollbar {
+            width: 0px;
+            background: transparent;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: transparent;
+            border-radius: 0px;
+        }
+        /* For Firefox */
+        html {
+            scrollbar-width: none;
+            scrollbar-color: transparent transparent;
+        }
+
+        /* Responsive Adjustments */
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2.5em; /* Smaller title on small screens */
+                margin-top: 10px;
+                margin-bottom: 10px;
+            }
+
+            .header-container {
+                flex-direction: column;
+                gap: 10px;
+                width: auto;
+                margin-left: 15px;
+                margin-right: 15px;
+                margin-bottom: 10px;
+            }
+
+            .header-container h1 {
+                margin: 0;
+            }
+
+            .logout-btn {
+                width: 100%;
+                text-align: center;
+                margin-left: 0;
+            }
+
+            .chat-wrapper {
+                margin-left: 15px;
+                margin-right: 15px;
+                width: auto; /* Allow it to fit without fixed width */
+                margin-bottom: 10px; /* Less margin at the bottom on small screens */
+            }
+
+            #chatbox {
+                padding: 15px;
+            }
+
+            #userInput {
+                flex-direction: column;
+                align-items: stretch;
+                padding: 15px;
+            }
+
+            #textInput,
+            #buttonInput,
+            #recordButton,
+            #voiceSelect,
+            #speechSpeedSelect {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header-container">
+        <h1><b>ChatGMP</b></h1>
+        <a href="/logout" class="logout-btn">Logout</a>
+    </div>
+
+    <div class="chat-wrapper">
+        <div id="chatbox">
+            <p class="botText">
+                <span>Hi! I'm ChatGMP</span>
+            </p>
+            </div>
+        <div id="userInput">
+            <textarea id="textInput" name="msg" placeholder="Type your message or record a question..." rows="1"></textarea>
+            <input id="buttonInput" type="submit" value="Send"> <button id="recordButton">Record</button>
+            <div id="controlsRow">
+            <select id="providerSelect" onchange="setProvider(this.value)">
+                <option value="mistral" selected>AI: Mistral</option>
+                <option value="gemini">AI: Gemini</option>
+            </select>
+            <button id="toggleSpeechButton">Speech: ON</button>
+            <select id="voiceSelect"></select>
+            <select id="speechSpeedSelect">
+                <option value="0.75">Speed: 0.75x</option>
+                <option value="1" selected>Speed: 1x</option>
+                <option value="1.25">Speed: 1.25x</option>
+                <option value="1.5">Speed: 1.5x</option>
+                <option value="2">Speed: 2x</option>
+            </select>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function setProvider(provider) {
+            $.ajax({
+                url: '/set_provider',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ provider: provider }),
+                success: function(data) {
+                    $('#providerSelect').val(data.provider);
+                }
+            });
+        }
+
+        let mediaRecorder;
+        let audioChunks = [];
+        let isRecording = false;
+        let recordingTimer = null;
+        const MAX_RECORD_SECONDS = 60;
+
+        // --- TTS Functionality ---
+        const synth = window.speechSynthesis;
+        let voices = [];
+        let enableSpeech = true; // Initial state: Speech is ON by default
+
+        // Function to populate the voice dropdown
+        function populateVoiceList() {
+            voices = synth.getVoices().sort((a, b) => {
+                const langA = a.lang.toLowerCase();
+                const langB = b.lang.toLowerCase();
+                if (langA < langB) return -1;
+                if (langA > langB) return 1;
+                const nameA = a.name.toLowerCase();
+                const nameB = b.name.toLowerCase();
+                if (nameA < nameB) return -1;
+                if (nameA > nameB) return 1;
+                return 0;
+            });
+
+            const voiceSelect = $('#voiceSelect');
+            voiceSelect.empty(); // Clear existing options
+
+            // Add an "Auto" or "Default" option
+            voiceSelect.append($('<option>', {
+                value: 'default',
+                text: 'Voice: Auto'
+            }));
+
+            voices.forEach(voice => {
+                const option = $('<option>', {
+                    value: voice.name,
+                    text: `Voice: ${voice.name} (${voice.lang})${voice.default ? ' - Default' : ''}`
+                });
+                voiceSelect.append(option);
+            });
+
+            // Set the selected voice from localStorage or try to pre-select an English voice
+            const storedVoiceName = localStorage.getItem('selectedVoiceName');
+            if (storedVoiceName) {
+                voiceSelect.val(storedVoiceName);
+            } else {
+                // Try to auto-select a reasonable English voice
+                const englishVoice = voices.find(v => v.lang.startsWith('en-'));
+                if (englishVoice) {
+                    voiceSelect.val(englishVoice.name);
+                } else if (voices.length > 0) {
+                    voiceSelect.val(voices[0].name); // Fallback to first available
+                }
+            }
+        }
+
+        // Event listener for voiceschanged
+        if (synth.onvoiceschanged !== undefined) {
+            synth.onvoiceschanged = populateVoiceList;
+        } else {
+            populateVoiceList(); // Call immediately if event not supported (less common now)
+        }
+
+        function speakText(text) {
+            if (!enableSpeech) {
+                console.log("Speech is disabled by user.");
+                return;
+            }
+
+            if (synth.speaking) {
+                synth.cancel();
+            }
+            if (text !== '') {
+                const utterance = new SpeechSynthesisUtterance(text);
+                
+                // Get selected voice from dropdown
+                const selectedVoiceName = $('#voiceSelect').val();
+                if (selectedVoiceName && selectedVoiceName !== 'default') {
+                    utterance.voice = voices.find(voice => voice.name === selectedVoiceName);
+                } else {
+                    // If 'default' selected or no specific voice found, let browser pick
+                    const englishVoice = voices.find(voice => voice.lang.startsWith('en-') && voice.name !== 'default');
+                    if (englishVoice) {
+                        utterance.voice = englishVoice;
+                    } else if (voices.length > 0) {
+                        utterance.voice = voices[0];
+                    }
+                }
+                
+                utterance.pitch = 1;
+                utterance.rate = parseFloat($('#speechSpeedSelect').val()) || 1;
+                utterance.volume = 1;
+
+                utterance.onerror = (event) => {
+                    console.error('Speech synthesis error:', event.error);
+                };
+
+                synth.speak(utterance);
+            }
+        }
+
+        function toggleSpeech() {
+            enableSpeech = !enableSpeech;
+            const button = $("#toggleSpeechButton");
+            if (enableSpeech) {
+                button.text("Speech: ON").removeClass("off").addClass("on");
+                console.log("Speech enabled.");
+            } else {
+                if (synth.speaking) {
+                    synth.cancel();
+                }
+                button.text("Speech: OFF").removeClass("on").addClass("off");
+                console.log("Speech disabled.");
+            }
+            localStorage.setItem('enableSpeech', enableSpeech);
+        }
+        // --- End TTS Functionality ---
+
+        function getBotResponse(message) {
+            const rawText = message || $("#textInput").val();
+            if (rawText.trim() === "") {
+                return;
+            }
+
+            const userHtml = '<p class="userText"><span>' + rawText + "</span></p>";
+            $("#chatbox").append(userHtml);
+            $("#textInput").val(""); // Clear the input field
+            $("#textInput")[0].style.height = "auto"; // Reset height
+
+            // Dynamically create and append loading indicator
+            const loadingIndicatorHtml = `
+                <div class="loading-indicator temp-loading-indicator">
+                    <span>
+                        <div class="dot"></div>
+                        <div class="dot"></div>
+                        <div class="dot"></div>
+                    </span>
+                </div>
+            `;
+            $("#chatbox").append(loadingIndicatorHtml);
+            $("#chatbox").scrollTop($("#chatbox")[0].scrollHeight); // Scroll to show it
+
+            let url = "/get";
+            let dataToSend = { msg: rawText };
+
+            $.get(url, dataToSend).done(function (data) {
+                // Remove the dynamic loading indicator on success
+                $(".temp-loading-indicator").remove();
+
+                let botHtml = ''; // Initialize botHtml
+                let speakableText = ''; // Initialize speakableText
+
+                if (data && data.type === 'video') {
+                    const videoUrl = data.url;
+                    // Check if it's a YouTube embed or direct video file
+                    if (videoUrl.includes('youtube.com/embed')) { // Assuming the backend provides the /embed/ URL directly
+                        botHtml = `
+                            <p class="botText">
+                                <span>
+                                    <div class="video-container">
+                                        <iframe src="${videoUrl}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                                    </div>
+                                    <br>Here's a video from YouTube for you!
+                                </span>
+                            </p>`;
+                        speakableText = "Here's a video for you."; // What the bot will say
+                    } else {
+                        // Assume it's a direct video file (e.g., .mp4, .webm)
+                        botHtml = `
+                            <p class="botText">
+                                <span>
+                                    <div class="video-container">
+                                        <video controls width="100%" preload="metadata">
+                                            <source src="${videoUrl}" type="video/mp4">
+                                            Your browser does not support the video tag.
+                                        </video>
+                                    </div>
+                                    <br>Here's the video you requested!
+                                </span>
+                            </p>`;
+                        speakableText = "Here's the video you requested!"; // What the bot will say
+                    }
+                } else if (data && data.type === 'text') {
+                    const botAnswer = data.answer || data.chatbot_answer || "I didn't quite catch that.";
+                    botHtml = '<p class="botText"><span>' + botAnswer + "</span></p>";
+                    speakableText = botAnswer; // What the bot will say
+                    
+                    // If a document was requested, open it in a new tab
+                    if (data.document) {
+                        const docName = encodeURIComponent(data.document);
+                        setTimeout(() => {
+                            window.open(`/document/${docName}`, '_blank');
+                        }, 500); // Slight delay to ensure response is displayed first
+                    }
+                } else {
+                    // Fallback for unexpected or empty data
+                    console.error("Received unexpected data format:", data); // Log the data to console for debugging
+                    const botAnswer = "I received an unexpected response from the server.";
+                    botHtml = '<p class="botText"><span>' + botAnswer + "</span></p>";
+                    speakableText = botAnswer;
+                }
+                
+                $("#chatbox").append(botHtml);
+                $("#chatbox").scrollTop($("#chatbox")[0].scrollHeight);
+                speakText(speakableText); // Speak the generated text
+            }).fail(function(jqXHR, textStatus, errorThrown) {
+                // Remove the dynamic loading indicator on failure
+                $(".temp-loading-indicator").remove();
+                console.error("AJAX request failed:", textStatus, errorThrown, jqXHR.responseText); // Log full error details
+
+                const errorHtml = '<p class="botText"><span>Oops! Something went wrong. Please try again.</span></p>';
+                $("#chatbox").append(errorHtml);
+                $("#chatbox").scrollTop($("#chatbox")[0].scrollHeight);
+                speakText("Oops! Something went wrong. Please try again.");
+            });
+        }
+
+        $("#textInput").on("input", function() {
+            this.style.height = "auto";
+            this.style.height = this.scrollHeight + "px";
+        });
+
+        $("#textInput").keypress(function (e) {
+            if (e.which == 13 && !e.shiftKey) {
+                e.preventDefault();
+                getBotResponse();
+            }
+        });
+
+        $("#buttonInput").click(function() {
+            getBotResponse();
+        });
+
+        $("#toggleSpeechButton").click(toggleSpeech);
+
+        // Event listener for voice selection change
+        $('#voiceSelect').change(function() {
+            const selectedVoiceName = $(this).val();
+            localStorage.setItem('selectedVoiceName', selectedVoiceName);
+            console.log("Selected voice:", selectedVoiceName);
+            if (enableSpeech && selectedVoiceName !== 'default') {
+                speakText("Hello, this is a test of the new voice.");
+            }
+        });
+
+        // Event listener for speed selection change
+        $('#speechSpeedSelect').change(function() {
+            const selectedSpeed = $(this).val();
+            localStorage.setItem('selectedSpeechSpeed', selectedSpeed);
+            console.log("Selected speech speed:", selectedSpeed);
+        });
+        // --- End New ---
+
+        // --- Record Button Logic ---
+        $("#recordButton").click(function() {
+            if (!isRecording) {
+                startRecording();
+            } else {
+                stopRecording();
+            }
+        });
+
+        async function startRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm'
+                              : MediaRecorder.isTypeSupported('audio/mp4')  ? 'audio/mp4'
+                              : '';
+                mediaRecorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+                audioChunks = [];
+
+                mediaRecorder.ondataavailable = event => {
+                    audioChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = async () => {
+                    const blobType = mimeType || mediaRecorder.mimeType || 'audio/webm';
+                    const ext = blobType.includes('mp4') ? 'mp4' : 'webm';
+                    const audioBlob = new Blob(audioChunks, { type: blobType });
+                    console.log("Audio recorded:", audioBlob, "type:", blobType);
+
+                    // Dynamically create and append loading indicator for transcription
+                    const loadingIndicatorHtml = `
+                        <div class="loading-indicator temp-loading-indicator">
+                            <span>
+                                <div class="dot"></div>
+                                <div class="dot"></div>
+                                <div class="dot"></div>
+                            </span>
+                        </div>
+                    `;
+                    $("#chatbox").append(loadingIndicatorHtml);
+                    $("#chatbox").scrollTop($("#chatbox")[0].scrollHeight);
+
+                    const formData = new FormData();
+                    formData.append('audio', audioBlob, `recorded_audio.${ext}`);
+                    $.ajax({
+                        url: '/transcribe_audio',
+                        type: 'POST',
+                        data: formData,
+                        processData: false,
+                        contentType: false,
+                        success: function(response) {
+                            // Remove the dynamic loading indicator on transcription success
+                            $(".temp-loading-indicator").remove();
+                            if (response && response.transcribed_text) {
+                                const userHtml = '<p class="userText"><span>' + response.transcribed_text + "</span></p>";
+                                $("#chatbox").append(userHtml);
+                                $("#chatbox").scrollTop($("#chatbox")[0].scrollHeight);
+
+                                if (response.chatbot_answer) {
+                                    const botHtml = '<p class="botText"><span>' + response.chatbot_answer + "</span></p>";
+                                    $("#chatbox").append(botHtml);
+                                    $("#chatbox").scrollTop($("#chatbox")[0].scrollHeight);
+                                    speakText(response.chatbot_answer);
+                                    
+                                    // If a document was requested, open it in a new tab
+                                    if (response.document) {
+                                        const docName = encodeURIComponent(response.document);
+                                        setTimeout(() => {
+                                            window.open(`/document/${docName}`, '_blank');
+                                        }, 500);
+                                    }
+                                } else {
+                                    const botHtml = '<p class="botText"><span>Could not get a chatbot answer.</span></p>';
+                                    $("#chatbox").append(botHtml);
+                                    $("#chatbox").scrollTop($("#chatbox")[0].scrollHeight);
+                                    speakText("Could not get a chatbot answer.");
+                                }
+                            } else {
+                                const errorText = response && response.error ? response.error : "Sorry, I couldn't transcribe that. Please try again.";
+                                const errorHtml = '<p class="botText"><span>' + errorText + '</span></p>';
+                                $("#chatbox").append(errorHtml);
+                                $("#chatbox").scrollTop($("#chatbox")[0].scrollHeight);
+                                speakText(errorText);
+                            }
+                        },
+                        error: function(jqXHR, textStatus, errorThrown) {
+                            // Remove the dynamic loading indicator on transcription error
+                            $(".temp-loading-indicator").remove();
+                            console.error("AJAX transcription request failed:", textStatus, errorThrown, jqXHR.responseText);
+                            const errorHtml = '<p class="botText"><span>Error communicating with transcription service. Please try again.</span></p>';
+                            $("#chatbox").append(errorHtml);
+                            $("#chatbox").scrollTop($("#chatbox")[0].scrollHeight);
+                            speakText("Error communicating with transcription service. Please try again.");
+                        }
+                    });
+
+                    stream.getTracks().forEach(track => track.stop());
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                $("#recordButton").text(`Stop (${MAX_RECORD_SECONDS}s)`).addClass("recording");
+                let secondsLeft = MAX_RECORD_SECONDS;
+                recordingTimer = setInterval(() => {
+                    secondsLeft--;
+                    if (secondsLeft <= 0) {
+                        stopRecording();
+                    } else {
+                        $("#recordButton").text(`Stop (${secondsLeft}s)`);
+                    }
+                }, 1000);
+            } catch (err) {
+                console.error("Error accessing microphone:", err);
+                alert("Could not access your microphone. Please ensure it's connected and you've granted permission.");
+            }
+        }
+
+        function stopRecording() {
+            if (recordingTimer) { clearInterval(recordingTimer); recordingTimer = null; }
+            if (mediaRecorder && mediaRecorder.state === "recording") {
+                mediaRecorder.stop();
+                isRecording = false;
+                $("#recordButton").text("Record").removeClass("recording");
+            }
+        }
+
+        $(document).ready(function() {
+            $("#chatbox").scrollTop($("#chatbox")[0].scrollHeight);
+
+            // Load speech preference from localStorage
+            const storedSpeechPreference = localStorage.getItem('enableSpeech');
+            if (storedSpeechPreference !== null) {
+                enableSpeech = (storedSpeechPreference === 'true');
+            }
+            $("#toggleSpeechButton").text(enableSpeech ? "Speech: ON" : "Speech: OFF")
+                                    .addClass(enableSpeech ? "on" : "off");
+
+            // Load speech speed preference from localStorage
+            const storedSpeed = localStorage.getItem('selectedSpeechSpeed');
+            if (storedSpeed) {
+                $('#speechSpeedSelect').val(storedSpeed);
+            }
+
+            // Populate voices and set initial selection
+            populateVoiceList(); // Call it once more in case voices were not ready initially
+
+            // Speak the initial welcome message only if speech is enabled
+            const initialBotMessage = $("#chatbox .botText:first span").text();
+            if (initialBotMessage && enableSpeech) {
+                speakText(initialBotMessage);
+            }
+        });
+    </script>
+</body>
+</html>

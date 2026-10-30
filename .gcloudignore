@@ -1,0 +1,28 @@
+# .gcloudignore file for Cloud Build
+# Exclude config files with secrets
+api_config.py
+.env
+.env.local
+
+# Other excludes
+__pycache__/
+*.pyc
+*.pyo
+.git/
+.gitignore
+.venv/
+venv/
+env/
+*.log
+.DS_Store
+.vscode/
+.idea/
+.pytest_cache/
+.coverage
+*.egg-info/
+dist/
+build/
+deploy_https.sh
+generate_certs.sh
+instance/
+

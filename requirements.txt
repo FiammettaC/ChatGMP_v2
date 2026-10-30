@@ -1,0 +1,46 @@
+# Web Framework & Core Utilities
+Flask>=2.2.0
+gevent>=23.9.0
+Flask-Login>=0.6.2
+Flask-SQLAlchemy>=3.0.0
+Werkzeug>=3.0.0
+Jinja2>=3.1.2
+MarkupSafe>=2.1.0
+cryptography>=41.0.0
+
+# AI / Machine Learning
+transformers==4.36.2
+sentence-transformers==2.7.0
+openai-whisper
+mistralai>=1.0,<2
+google-generativeai>=0.8.0
+pydantic>=2.5.2,<3.0.0
+
+# PyTorch Ecosystem
+# torch, torchvision, torchaudio are installed separately in Dockerfile with CUDA support
+#torch==2.1.1
+#torchaudio==2.1.1
+#torchvision==0.16.1
+accelerate
+# Only CPU
+#--extra-index-url https://download.pytorch.org/whl/cpu
+#torch==2.1.1+cpu
+#torchaudio==2.1.1+cpu
+#torchvision==0.16.1+cpu
+
+# Common libraries
+numpy==1.26.4
+#scipy==1.13.1
+#pandas==2.2.0
+#matplotlib>=3.5.0
+#scikit-learn
+
+# Audio/File Handling
+pydub==0.25.1
+#soundfile==0.12.1
+#SpeechRecognition==3.10.0
+#pypdf2==3.0.1
+
+# Image/Vision
+#Pillow>=10.0.0
+#opencv-python==4.10.0.84

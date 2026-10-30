@@ -1,0 +1,31 @@
+name: chatgmp
+
+services:
+  chatgmp-app:
+    build: .
+    container_name: chatgmp-app
+    init: true
+    ports:
+      - "443:8443"
+    environment:
+      - FLASK_ENV=production
+      - FLASK_DEBUG=0
+      - PORT=8443
+      # Required: set these via a .env file or export them before running docker compose
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - LECHAT_API_KEY=${LECHAT_API_KEY}
+      - FLASK_SECRET_KEY=${FLASK_SECRET_KEY}
+    volumes:
+      - ./data:/app/data
+      - ./static:/app/static
+      - ./templates:/app/templates
+    restart: on-failure:5
+    # GPU support - requires nvidia-docker or Docker with GPU runtime installed
+    #deploy:
+    #  resources:
+    #    reservations:
+    #      devices:
+    #        - driver: nvidia
+    #          count: all
+    #          capabilities: [gpu]
+
