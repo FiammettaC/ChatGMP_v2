@@ -11,7 +11,7 @@ If you have any questions regarding the exercises or any feedback on the course,
 
 ## Read more about it
 You can find the original manuscript [here](https://www.sciencedirect.com/science/article/pii/S2666920X24001577).
-The updated version is presented [here](https://arxiv.org/abs/2603.17773).
+The newest studies, including the new interface, are presented [here](https://arxiv.org/abs/2603.17773).
 
 ## Cite this work
 If you would like to cite this work, please reference our paper: **Large Language Models in Teaching and Learning: Reflections on Implementing an AI Chatbot in Higher Education**.
